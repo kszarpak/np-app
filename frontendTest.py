@@ -5,7 +5,7 @@ from os import environ
 from selenium.webdriver.common.by import By
 
 application_URL = environ.get('APPLICATION_URL', 'http://192.168.44.45:5000/')
-selenium_URL = environ.get('SELENIUM_URL', 'http://192.168.44.45:4444/wd/hub')
+selenium_URL = environ.get('SELENIUM_URL', 'http://sonarqube:4444/wd/hub')
 
 
 class AppTest(unittest.TestCase):
