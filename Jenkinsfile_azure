@@ -1,0 +1,68 @@
+def frontendImage="kornzysiek/frontend"
+def backendImage="kornzysiek/backend"
+
+pipeline {
+    agent {
+        label 'agent'
+    }
+    parameters {
+        string(name: 'backendDockerTag', defaultValue: 'latest', description: 'Backend docker image tag')
+        string(name: 'frontendDockerTag', defaultValue: 'latest', description: 'Frontend docker image tag')
+    }
+    stages {
+        stage('Show version') {
+            steps {
+                script{
+                    currentBuild.description = "Backend: ${backendDockerTag}, Frontend: ${frontendDockerTag}"
+                }
+            }
+        }
+        stage('Update Azure Container Apps') {
+            steps {
+                script {
+                    // Login to Azure (assuming credentials are configured in Jenkins)
+                    withCredentials([azureServicePrincipal('azure')]) {
+                        sh 'az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID'
+                    }
+                    
+                    // Update backend app
+                    sh """
+                        az containerapp update \
+                          --name backend-app \
+                          --resource-group nprog \
+                          --image ${backendImage}:${params.backendDockerTag}
+                    """
+                    
+                    // Get backend FQDN
+                    def backendFqdn = sh(script: '''
+                        az containerapp show \
+                          --name backend-app \
+                          --resource-group nprog \
+                          --query properties.configuration.ingress.fqdn \
+                          --output tsv
+                    ''', returnStdout: true).trim()
+                    
+                    // Update frontend app
+                    sh """
+                        az containerapp update \
+                          --name frontend-app \
+                          --resource-group nprog \
+                          --image ${frontendImage}:${params.frontendDockerTag} \
+                          --set-env-vars BACKEND_URL=https://${backendFqdn}
+                    """
+                    
+                    // Get frontend FQDN and display it
+                    def frontendFqdn = sh(script: '''
+                        az containerapp show \
+                          --name frontend-app \
+                          --resource-group nprog \
+                          --query properties.configuration.ingress.fqdn \
+                          --output tsv
+                    ''', returnStdout: true).trim()
+                    
+                    echo "Your updated application is accessible at: https://${frontendFqdn}"
+                }
+            }
+        }
+    }
+}
