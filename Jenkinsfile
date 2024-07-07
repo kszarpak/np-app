@@ -9,7 +9,7 @@ pipeline {
     environment {
         PIP_BREAK_SYSTEM_PACKAGES = 1
     }
-    
+   
     parameters {
         string(name: 'backendDockerTag', defaultValue: 'latest', description: 'Backend docker image tag')
         string(name: 'frontendDockerTag', defaultValue: 'latest', description: 'Frontend docker image tag')
@@ -39,7 +39,7 @@ pipeline {
         stage('Deploy application') {
             steps {
                 script {
-                    withEnv(["FRONTEND_IMAGE=$frontendImage:$frontendDockerTag", 
+                    withEnv(["FRONTEND_IMAGE=$frontendImage:$frontendDockerTag",
                              "BACKEND_IMAGE=$backendImage:$backendDockerTag"]) {
                         sh "docker-compose up -d"
                     }
@@ -54,11 +54,20 @@ pipeline {
             }
         }
     }
-
+    
     post {
+        success {
+            input message: 'Do you want to proceed with the deployment?', ok: 'Yes'
+            build job: 'deploy', 
+                  parameters: [
+                      string(name: 'backendDockerTag', value: params.backendDockerTag),
+                      string(name: 'frontendDockerTag', value: params.frontendDockerTag)
+                  ],
+                  wait: false
+        }
         always {
-          sh "docker-compose down"
-          cleanWs()
+            sh "docker-compose down"
+            cleanWs()
         }
     }
 }
