@@ -1,0 +1,65 @@
+variables:
+  FRONTEND_IMAGE: kornzysiek/frontend
+  BACKEND_IMAGE: kornzysiek/backend
+  FRONTEND_DOCKER_TAG: latest
+  BACKEND_DOCKER_TAG: latest
+  DOCKER_HOST: unix:///var/run/docker.sock
+  JENKINS_TOKEN: 11bb561898d63517c2d02c497ed107bacf
+
+stages:
+  - setup
+  - deploy
+  - test
+  - clean
+  - approve
+  - trigger_jenkins_job
+
+.docker_job:
+  image: docker:20.10.16
+  tags:
+    - docker
+  before_script:
+    - docker info
+
+clean_and_deploy:
+  stage: deploy
+  extends: .docker_job
+  script:
+    - docker rm -f frontend backend || true
+    - |
+      FRONTEND_IMAGE=$FRONTEND_IMAGE:$FRONTEND_DOCKER_TAG \
+      BACKEND_IMAGE=$BACKEND_IMAGE:$BACKEND_DOCKER_TAG \
+      docker-compose up -d
+
+selenium_tests:
+  stage: test
+  image: python:3.9
+  tags:
+    - docker
+  before_script:
+    - pip3 install -r requirements.txt
+  script:
+    - python3 -m pytest frontendTest.py
+
+clean:
+  stage: clean
+  extends: .docker_job
+  script:
+    - docker rm -f frontend backend || true
+
+manual_approval:
+  stage: approve
+  script:
+    - echo "Waiting for manual approval"
+  when: manual
+
+trigger_jenkins_job:
+  stage: trigger_jenkins_job
+  image: curlimages/curl:latest
+  script:
+    - |
+      curl -X POST \
+        -u nprog:$JENKINS_TOKEN \
+        "jenkins:8080/job/deploy/build"
+  needs:
+    - manual_approval
