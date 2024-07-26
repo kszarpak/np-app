@@ -1,5 +1,5 @@
-def frontendImage="kornzysiek/frontend"
-def backendImage="kornzysiek/backend"
+def frontendImage="kszarpak/frontend"
+def backendImage="kszarpak/backend"
 
 pipeline {
     agent {
